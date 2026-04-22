@@ -36,21 +36,49 @@ function init() {
 }
 
 function showPicker() {
-  var view = new google.picker.DocsView(google.picker.ViewId.DOCS)
+  // Tab 1: Recent files and folders
+  var recentView = new google.picker.DocsView(google.picker.ViewId.RECENTLY_PICKED)
     .setIncludeFolders(true)
     .setSelectFolderEnabled(true)
-    .setMode(google.picker.DocsViewMode.LIST);
+    .setMode(google.picker.DocsViewMode.LIST)
+    .setLabel('Recent');
+
+  // Tab 2: Shared Drives (Team Drives)
+  var sharedDrivesView = new google.picker.DocsView(google.picker.ViewId.DOCS)
+    .setIncludeFolders(true)
+    .setSelectFolderEnabled(true)
+    .setEnableTeamDrives(true)
+    .setMode(google.picker.DocsViewMode.LIST)
+    .setLabel('Shared Drives');
+
+  // Tab 3: Starred files and folders
+  var starredView = new google.picker.DocsView(google.picker.ViewId.DOCS)
+    .setIncludeFolders(true)
+    .setSelectFolderEnabled(true)
+    .setMode(google.picker.DocsViewMode.LIST)
+    .setQuery('is:starred')
+    .setLabel('Starred');
+
+  // Tab 4: Full My Drive browser as a fallback
+  var myDriveView = new google.picker.DocsView(google.picker.ViewId.DOCS)
+    .setIncludeFolders(true)
+    .setSelectFolderEnabled(true)
+    .setMode(google.picker.DocsViewMode.LIST)
+    .setLabel('My Drive');
 
   var builder = new google.picker.PickerBuilder()
     .setDeveloperKey(developerKey)
     .setOAuthToken(oauthToken)
     .setCallback(pickerCallback)
     .setOrigin(window.location.origin)
-    .setTitle('Select a Google Drive file or folder')
-    .setMaxItems(1);
+    .setTitle('Select a file or folder')
+    .setMaxItems(1)
+    .addView(recentView)
+    .addView(sharedDrivesView)
+    .addView(starredView)
+    .addView(myDriveView);
 
   if (appId) builder.setAppId(appId);
-  builder.addView(view);
   builder.build().setVisible(true);
 }
 
