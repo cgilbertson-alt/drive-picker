@@ -58,10 +58,12 @@ function pickerCallback(data) {
   var action = data[google.picker.Response.ACTION];
   if (action === google.picker.Action.PICKED) {
     var doc = data[google.picker.Response.DOCUMENTS][0];
-    window.opener.postMessage({ type: 'PICKER_PICKED', doc: doc }, openerOrigin);
+    // Use '*' as target origin — the page may be embedded in a Google Site iframe,
+    // so the opener's effective origin can differ from the Apps Script URL.
+    window.opener.postMessage({ type: 'PICKER_PICKED', doc: doc }, '*');
     window.close();
   } else if (action === google.picker.Action.CANCEL) {
-    window.opener.postMessage({ type: 'PICKER_CANCEL' }, openerOrigin);
+    window.opener.postMessage({ type: 'PICKER_CANCEL' }, '*');
     window.close();
   }
 }
