@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Choose from Drive</title>
+<style>
+  body { margin: 20px; font-family: sans-serif; }
+  #msg { color: #667085; font-size: .9rem; }
+</style>
+</head>
+<body>
+<div id="msg">Loading Google Drive…</div>
+<script>
+var oauthToken = '', developerKey = '', appId = '', openerOrigin = '';
+
+function init() {
+  var params = new URLSearchParams(window.location.search);
+  var encoded = params.get('ctx');
+  if (!encoded) {
+    document.getElementById('msg').textContent = 'Error: missing context.';
+    return;
+  }
+  try {
+    var ctx = JSON.parse(atob(encoded));
+    oauthToken   = ctx.oauthToken;
+    developerKey = ctx.developerKey;
+    appId        = ctx.appId;
+    openerOrigin = ctx.openerOrigin;
+  } catch(e) {
+    document.getElementById('msg').textContent = 'Error: bad context.';
+    return;
+  }
+
+  var s = document.createElement('script');
+  s.src = 'https://apis.google.com/js/api.js';
+  s.onload = function() {
+    gapi.load('picker', function() {
+      document.getElementById('msg').textContent = '';
+      showPicker();
+    });
+  };
+  document.body.appendChild(s);
+}
+
+function showPicker() {
+  var view = new google.picker.DocsView(google.picker.ViewId.DOCS)
+    .setIncludeFolders(true)
+    .setSelectFolderEnabled(true)
+    .setMode(google.picker.DocsViewMode.LIST);
+
+  var builder = new google.picker.PickerBuilder()
+    .setDeveloperKey(developerKey)
+    .setOAuthToken(oauthToken)
+    .setCallback(pickerCallback)
+    .setOrigin(openerOrigin)
+    .setTitle('Select a Google Drive file or folder')
+    .setMaxItems(1);
+
+  if (appId) builder.setAppId(appId);
+  builder.addView(view);
+  builder.build().setVisible(true);
+}
+
+function pickerCallback(data) {
+  var action = data[google.picker.Response.ACTION];
+  if (action === google.picker.Action.PICKED) {
+    var doc = data[google.picker.Response.DOCUMENTS][0];
+    window.opener.postMessage({ type: 'PICKER_PICKED', doc: doc }, openerOrigin);
+    window.close();
+  } else if (action === google.picker.Action.CANCEL) {
+    window.opener.postMessage({ type: 'PICKER_CANCEL' }, openerOrigin);
+    window.close();
+  }
+}
+
+init();
+</script>
+</body>
+</html>
