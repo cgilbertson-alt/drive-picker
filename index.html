@@ -4,148 +4,67 @@
 <meta charset="UTF-8">
 <title>Choose from Drive</title>
 <style>
-  body { margin: 20px; font-family: sans-serif; }
-  #msg { color: #667085; font-size: .9rem; margin-bottom: 12px; }
-  #debugPanel { padding: 12px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 10px; font-family: monospace; font-size: .78rem; margin-bottom: 12px; }
-  #debugLog { max-height: 400px; overflow-y: auto; line-height: 1.8; color: #334155; }
+  body { margin: 0; background: #fff; }
 </style>
 </head>
 <body>
-<div id="debugPanel"><div id="debugLog"></div></div>
-<div id="msg">Loading…</div>
-
 <script>
 var oauthToken = '', developerKey = '', appId = '', openerOrigin = '';
 
-function dbg(msg, colour) {
-  var log = document.getElementById('debugLog');
-  var ts  = new Date().toLocaleTimeString('en-GB', {hour12:false});
-  var c   = colour || '#334155';
-  log.innerHTML += '<div style="color:' + c + '"><span style="color:#94a3b8">[' + ts + ']</span> ' + msg + '</div>';
-  log.scrollTop = log.scrollHeight;
-  console.log(msg);
-}
-
 function init() {
-  dbg('init() called');
-  dbg('window.location.href = ' + window.location.href);
-  dbg('window.location.search = ' + window.location.search);
-
   var params = new URLSearchParams(window.location.search);
   var encoded = params.get('ctx');
-  dbg('encoded ctx present: ' + !!encoded + (encoded ? ' (length ' + encoded.length + ')' : ''));
-
-  if (!encoded) {
-    dbg('❌ No ctx parameter in URL', '#dc2626');
-    document.getElementById('msg').textContent = 'Error: missing context.';
-    return;
-  }
+  if (!encoded) { window.close(); return; }
 
   try {
     var ctx = JSON.parse(atob(encoded));
-    dbg('ctx decoded OK');
-    dbg('oauthToken length: ' + (ctx.oauthToken||'').length);
-    dbg('developerKey length: ' + (ctx.developerKey||'').length);
-    dbg('appId: ' + ctx.appId);
-    dbg('openerOrigin: ' + ctx.openerOrigin);
-
     oauthToken   = ctx.oauthToken;
     developerKey = ctx.developerKey;
     appId        = ctx.appId;
     openerOrigin = ctx.openerOrigin;
   } catch(e) {
-    dbg('❌ Failed to decode ctx: ' + e.message, '#dc2626');
-    document.getElementById('msg').textContent = 'Error: bad context.';
+    window.close();
     return;
   }
 
-  dbg('Loading api.js…');
   var s = document.createElement('script');
   s.src = 'https://apis.google.com/js/api.js';
   s.onload = function() {
-    dbg('api.js loaded — window.gapi: ' + !!window.gapi);
-    gapi.load('picker', {
-      callback: function() {
-        dbg('✅ Picker API ready', '#059669');
-        document.getElementById('msg').textContent = '';
-        showPicker();
-      },
-      onerror: function(err) {
-        dbg('❌ gapi.load picker error: ' + JSON.stringify(err), '#dc2626');
-      }
-    });
-  };
-  s.onerror = function() {
-    dbg('❌ api.js script failed to load', '#dc2626');
+    gapi.load('picker', function() { showPicker(); });
   };
   document.body.appendChild(s);
 }
 
 function showPicker() {
-  dbg('showPicker() called');
-  dbg('openerOrigin = ' + openerOrigin);
-  dbg('window.location.origin = ' + window.location.origin);
+  var view = new google.picker.DocsView(google.picker.ViewId.DOCS)
+    .setIncludeFolders(true)
+    .setSelectFolderEnabled(true)
+    .setMode(google.picker.DocsViewMode.LIST);
 
-  try {
-    var view = new google.picker.DocsView(google.picker.ViewId.DOCS)
-      .setIncludeFolders(true)
-      .setSelectFolderEnabled(true)
-      .setMode(google.picker.DocsViewMode.LIST);
-    dbg('DocsView created OK');
+  var builder = new google.picker.PickerBuilder()
+    .setDeveloperKey(developerKey)
+    .setOAuthToken(oauthToken)
+    .setCallback(pickerCallback)
+    .setOrigin(window.location.origin)
+    .setTitle('Select a Google Drive file or folder')
+    .setMaxItems(1);
 
-    var builder = new google.picker.PickerBuilder()
-      .setDeveloperKey(developerKey)
-      .setOAuthToken(oauthToken)
-      .setCallback(pickerCallback)
-      .setOrigin(window.location.origin)
-      .setTitle('Select a Google Drive file or folder')
-      .setMaxItems(1);
-
-    dbg('Using setOrigin: ' + window.location.origin);
-
-    if (appId) {
-      builder.setAppId(appId);
-      dbg('setAppId: ' + appId);
-    }
-
-    builder.addView(view);
-    dbg('View added — building picker…');
-
-    var picker = builder.build();
-    dbg('build() OK — calling setVisible(true) in 3s…');
-
-    window.setTimeout(function() {
-      picker.setVisible(true);
-      dbg('✅ setVisible(true) called', '#059669');
-    }, 3000);
-
-  } catch(e) {
-    dbg('❌ showPicker error: ' + e.message, '#dc2626');
-    document.getElementById('msg').textContent = 'Error: ' + e.message;
-  }
+  if (appId) builder.setAppId(appId);
+  builder.addView(view);
+  builder.build().setVisible(true);
 }
 
 function pickerCallback(data) {
-  dbg('pickerCallback fired — action: ' + data[google.picker.Response.ACTION]);
   var action = data[google.picker.Response.ACTION];
-
   if (action === google.picker.Action.PICKED) {
     var doc = data[google.picker.Response.DOCUMENTS][0];
-    dbg('✅ Picked: ' + (doc[google.picker.Document.NAME] || 'unknown'), '#059669');
     window.opener.postMessage({ type: 'PICKER_PICKED', doc: doc }, openerOrigin);
     window.close();
   } else if (action === google.picker.Action.CANCEL) {
-    dbg('Cancelled by user');
     window.opener.postMessage({ type: 'PICKER_CANCEL' }, openerOrigin);
     window.close();
   }
 }
-
-// Catch any uncaught errors
-window.onerror = function(msg, src, line, col, err) {
-  dbg('❌ Uncaught error: ' + msg + ' (line ' + line + ')', '#dc2626');
-  return false;
-};
 
 init();
 </script>
